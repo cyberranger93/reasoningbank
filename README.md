@@ -15,7 +15,11 @@ It is not a vector database and it does not require fine-tuning. It is a small l
 ## Quick Start
 
 ```bash
-npx reasoningbank
+git clone https://github.com/cyberranger93/reasoningbank.git
+cd reasoningbank
+npm install
+npm run build
+npm start
 ```
 
 The server starts on `http://localhost:8001`.
@@ -23,7 +27,7 @@ The server starts on `http://localhost:8001`.
 ## TypeScript SDK
 
 ```typescript
-import { ReasoningBank } from "reasoningbank/sdk";
+import { ReasoningBank } from "./dist/sdk.js";
 
 const rb = new ReasoningBank();
 
@@ -92,7 +96,7 @@ Data is stored locally at `~/.reasoningbank/trajectories.json`. Override it with
 
 ```bash
 $env:REASONINGBANK_DATA_DIR = "C:\\tmp\\reasoningbank"
-npx reasoningbank
+npm start
 ```
 
 ## Roadmap
