@@ -12,6 +12,8 @@ The problem is simple: agents repeat mistakes because every run starts cold. Fin
 
 Repo: https://github.com/cyberranger93/reasoningbank
 
+Attach: `assets/social-card.png` or `assets/demo.gif`
+
 ## Show HN Draft
 
 Title: Show HN: reasoningbank - episodic memory for AI agents
@@ -21,3 +23,5 @@ I built `reasoningbank` because my agents kept making the same mistakes across r
 It is a local Node/SQLite service that records task trajectories, outcomes, and useful steps. Before a new task starts, agents call `/suggest` and get relevant past experience to include in context. The first implementation uses lightweight keyword overlap so the mechanism is easy to inspect, with vector retrieval planned as an adapter.
 
 GitHub: https://github.com/cyberranger93/reasoningbank
+
+Attach: `assets/demo.gif`

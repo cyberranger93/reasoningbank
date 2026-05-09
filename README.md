@@ -6,7 +6,7 @@
 [![CI](https://github.com/cyberranger93/reasoningbank/actions/workflows/ci.yml/badge.svg)](https://github.com/cyberranger93/reasoningbank/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-<!-- Add assets/demo.gif before launch. Show: first run fails, later run retrieves a useful past trajectory. -->
+![reasoningbank demo](assets/demo.gif)
 
 AI agents often repeat mistakes because each run starts from scratch. `reasoningbank` records task trajectories, outcomes, and useful steps, then returns relevant past experience before the next run starts.
 
