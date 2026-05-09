@@ -1,35 +1,110 @@
-import Database from "better-sqlite3";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
-import { mkdirSync } from "fs";
 
-const DATA_DIR = process.env.REASONINGBANK_DATA_DIR ?? path.join(process.env.HOME ?? ".", ".reasoningbank");
+export interface StoredStep {
+  action: string;
+  result: string;
+  timestamp: number;
+}
+
+export interface StoredSession {
+  id: string;
+  agent_id: string | null;
+  task_description: string;
+  steps: StoredStep[];
+  started_at: number;
+}
+
+export interface StoredTrajectory {
+  id: string;
+  agent_id: string | null;
+  task_description: string;
+  steps: StoredStep[];
+  outcome: "success" | "failure" | "partial";
+  score: number;
+  tags: string[];
+  created_at: number;
+}
+
+interface ReasoningBankData {
+  sessions: StoredSession[];
+  trajectories: StoredTrajectory[];
+}
+
+const DATA_DIR =
+  process.env.REASONINGBANK_DATA_DIR ??
+  path.join(process.env.HOME ?? process.env.USERPROFILE ?? ".", ".reasoningbank");
 mkdirSync(DATA_DIR, { recursive: true });
 
-const DB_PATH = path.join(DATA_DIR, "trajectories.db");
+const DB_PATH = path.join(DATA_DIR, "trajectories.json");
 
-export const db = new Database(DB_PATH);
+function readData(): ReasoningBankData {
+  try {
+    return JSON.parse(readFileSync(DB_PATH, "utf-8")) as ReasoningBankData;
+  } catch {
+    return { sessions: [], trajectories: [] };
+  }
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS trajectories (
-    id TEXT PRIMARY KEY,
-    agent_id TEXT,
-    task_description TEXT NOT NULL,
-    steps TEXT NOT NULL,            -- JSON array of {action, result, timestamp}
-    outcome TEXT CHECK(outcome IN ('success', 'failure', 'partial')) NOT NULL,
-    score REAL DEFAULT 0,           -- 0-1 quality score, higher = more useful
-    tags TEXT DEFAULT '[]',         -- JSON array of string tags
-    created_at INTEGER NOT NULL DEFAULT (unixepoch())
-  );
+function writeData(data: ReasoningBankData): void {
+  writeFileSync(DB_PATH, `${JSON.stringify(data, null, 2)}\n`, "utf-8");
+}
 
-  CREATE INDEX IF NOT EXISTS idx_trajectories_outcome ON trajectories(outcome);
-  CREATE INDEX IF NOT EXISTS idx_trajectories_score ON trajectories(score DESC);
-  CREATE INDEX IF NOT EXISTS idx_trajectories_created ON trajectories(created_at DESC);
+export const store = {
+  createSession(session: StoredSession): void {
+    const data = readData();
+    data.sessions.push(session);
+    writeData(data);
+  },
 
-  CREATE TABLE IF NOT EXISTS trajectory_sessions (
-    id TEXT PRIMARY KEY,
-    agent_id TEXT,
-    task_description TEXT NOT NULL,
-    steps TEXT NOT NULL DEFAULT '[]',
-    started_at INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-`);
+  getSession(id: string): StoredSession | undefined {
+    return readData().sessions.find((session) => session.id === id);
+  },
+
+  updateSessionSteps(id: string, steps: StoredStep[]): void {
+    const data = readData();
+    const session = data.sessions.find((item) => item.id === id);
+    if (!session) {
+      throw new Error(`Session ${id} not found`);
+    }
+    session.steps = steps;
+    writeData(data);
+  },
+
+  deleteSession(id: string): void {
+    const data = readData();
+    data.sessions = data.sessions.filter((session) => session.id !== id);
+    writeData(data);
+  },
+
+  createTrajectory(trajectory: StoredTrajectory): void {
+    const data = readData();
+    data.trajectories.push(trajectory);
+    writeData(data);
+  },
+
+  listTrajectoryCandidates(limit = 100): StoredTrajectory[] {
+    return readData()
+      .trajectories.filter((trajectory) => ["success", "partial"].includes(trajectory.outcome))
+      .sort((a, b) => b.score - a.score || b.created_at - a.created_at)
+      .slice(0, limit);
+  },
+
+  stats(): {
+    total: number;
+    success: number;
+    failure: number;
+    partial: number;
+    avg_score: number;
+  } {
+    const trajectories = readData().trajectories;
+    const total = trajectories.length;
+    const success = trajectories.filter((item) => item.outcome === "success").length;
+    const failure = trajectories.filter((item) => item.outcome === "failure").length;
+    const partial = trajectories.filter((item) => item.outcome === "partial").length;
+    const avg_score =
+      total === 0 ? 0 : trajectories.reduce((sum, item) => sum + item.score, 0) / total;
+
+    return { total, success, failure, partial, avg_score };
+  },
+};

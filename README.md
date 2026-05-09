@@ -1,121 +1,112 @@
 # reasoningbank
 
-> Shared learning pool for AI agents — every run makes all future runs smarter.
+> Episodic memory for AI agents: store what worked, retrieve it next run.
 
 [![npm](https://img.shields.io/npm/v/reasoningbank)](https://npmjs.com/package/reasoningbank)
-[![GitHub stars](https://img.shields.io/github/stars/cyberranger93/reasoningbank)](https://github.com/cyberranger93/reasoningbank)
+[![CI](https://github.com/cyberranger93/reasoningbank/actions/workflows/ci.yml/badge.svg)](https://github.com/cyberranger93/reasoningbank/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-<!-- hero GIF: success rate graph climbing across 5 runs -->
-<!-- ![demo](assets/demo.gif) -->
+<!-- Add assets/demo.gif before launch. Show: first run fails, later run retrieves a useful past trajectory. -->
 
-## The problem
+AI agents often repeat mistakes because each run starts from scratch. `reasoningbank` records task trajectories, outcomes, and useful steps, then returns relevant past experience before the next run starts.
 
-Your AI agents start from scratch every single run. They repeat the same mistakes. They forget what worked last time. Fine-tuning is expensive. RAG retrieves documents — not decision patterns.
-
-**ReasoningBank fills the gap:** it stores agent trajectory decisions (what steps were taken, which worked, which failed) and surfaces them to future agents before they run — like cross-agent episodic memory.
+It is not a vector database and it does not require fine-tuning. It is a small local service for agent builders who want durable, inspectable learning loops without native database dependencies.
 
 ## Quick Start
 
 ```bash
-# Start the ReasoningBank server
 npx reasoningbank
-
-# Server is now at http://localhost:8001
 ```
 
-### Python (10 lines)
+The server starts on `http://localhost:8001`.
+
+## TypeScript SDK
+
+```typescript
+import { ReasoningBank } from "reasoningbank/sdk";
+
+const rb = new ReasoningBank();
+
+const hints = await rb.suggest("research LLM pricing options");
+const session = await rb.start("research LLM pricing options");
+
+await rb.step(session, "searched provider docs", "found pricing tables");
+await rb.step(session, "compared context windows", "short-context calls are cheapest");
+await rb.end(session, { outcome: "success", score: 0.9, tags: ["pricing"] });
+```
+
+## Python SDK
+
+The lightweight Python SDK lives in `sdk/python`:
 
 ```python
 from reasoningbank import ReasoningBank
+
 rb = ReasoningBank()
-
-# Before running your agent:
-hints = rb.suggest("research LLM pricing options")
-# → hints = past steps that worked for similar tasks
-
-# While running:
 session = rb.start("research LLM pricing options")
-rb.step(session, "searched web", "found 5 providers")
-rb.step(session, "compared pricing tables", "OpenAI cheapest for short context")
+rb.step(session, "searched provider docs", "found pricing tables")
 rb.end(session, outcome="success", score=0.9)
-```
-
-Install: `pip install reasoningbank`
-
-### TypeScript (10 lines)
-
-```typescript
-import { ReasoningBank } from "reasoningbank/sdk"
-const rb = new ReasoningBank()
-
-const hints = await rb.suggest("research LLM pricing")
-const session = await rb.start("research LLM pricing")
-await rb.step(session, "searched web", "found 5 providers")
-await rb.end(session, { outcome: "success", score: 0.9 })
 ```
 
 ## REST API
 
 ```bash
-# Start session
 POST /trajectory/start
-{"task_description": "...", "agent_id": "optional"}
+{"task_description": "research LLM pricing", "agent_id": "optional"}
 
-# Add step
 POST /trajectory/step
-{"session_id": "...", "action": "...", "result": "..."}
+{"session_id": "...", "action": "searched docs", "result": "found 5 providers"}
 
-# End session
 POST /trajectory/end
-{"session_id": "...", "outcome": "success|failure|partial", "score": 0.9}
+{"session_id": "...", "outcome": "success", "score": 0.9}
 
-# Get suggestions for a new task
 POST /suggest
-{"task_description": "...", "limit": 5}
+{"task_description": "compare LLM pricing", "limit": 5}
 
-# Stats
 GET /stats
 ```
 
 ## How It Works
 
-```
-Run 1:  agent runs task → steps recorded → outcome stored
-Run 2:  agent queries /suggest → gets relevant past steps → fewer mistakes
-Run 3+: agents converge on successful patterns → success rate improves
+```text
+Run 1:  agent runs task -> steps recorded -> outcome stored
+Run 2:  agent asks /suggest -> similar successful steps return
+Run 3+: prompts include proven patterns before the agent acts
 ```
 
-No retraining. No fine-tuning. No vector database required (SQLite, local, zero infra).
+By default, matching uses lightweight keyword overlap so the repo is easy to understand and run locally. The API boundary is intentionally simple so vector search, embeddings, or team-hosted storage can be added later without changing agent integrations.
 
 ## Why This vs Alternatives
 
-| | ReasoningBank | RAG | Fine-tuning | In-context memory |
+| Capability | reasoningbank | RAG | Fine-tuning | Prompt-only memory |
 |---|---|---|---|---|
-| Stores decision patterns | ✅ | ❌ (docs only) | ✅ | ✅ |
-| Persists across sessions | ✅ | ✅ | ✅ | ❌ |
-| Cross-agent sharing | ✅ | ❌ | ✅ | ❌ |
-| Zero infra (local SQLite) | ✅ | ❌ | ❌ | ✅ |
-| Works with any LLM | ✅ | ✅ | ❌ | ✅ |
-| Cost to set up | Free | $$ | $$$$ | Free |
+| Stores decisions and outcomes | Yes | No | Mixed | Mixed |
+| Persists across sessions | Yes | Yes | Yes | No |
+| Cross-agent sharing | Yes | Mixed | Yes | No |
+| Local SQLite default | Yes | Mixed | No | Yes |
+| Works with any LLM | Yes | Yes | No | Yes |
 
 ## Data
 
-All data stored locally at `~/.reasoningbank/trajectories.db` (SQLite). No external services. Override with `REASONINGBANK_DATA_DIR`.
+Data is stored locally at `~/.reasoningbank/trajectories.json`. Override it with:
 
-## Examples
+```bash
+$env:REASONINGBANK_DATA_DIR = "C:\\tmp\\reasoningbank"
+npx reasoningbank
+```
 
-See [`examples/`](examples/) for:
-- Groq agent loop with ReasoningBank
-- Claude agent via SDK
-- n8n workflow integration
+## Roadmap
+
+- [ ] Embedding-backed retrieval adapter
+- [ ] MCP server wrapper
+- [ ] Evaluation harness showing success rate across repeated runs
+- [ ] Hosted team mode with project-level namespaces
+- [ ] Demo GIF and launch video
 
 ## Contributing
 
 PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-[Good first issues →](https://github.com/cyberranger93/reasoningbank/labels/good%20first%20issue)
-
 ## License
 
-MIT © CyberRanger93
+MIT
